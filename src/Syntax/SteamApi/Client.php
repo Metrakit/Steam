@@ -4,12 +4,12 @@ namespace Syntax\SteamApi;
 
 use stdClass;
 use GuzzleHttp\Client as GuzzleClient;
-use GuzzleHttp\Psr7\Request;
 use Exception;
 use GuzzleHttp\Exception\ClientErrorResponseException;
 use GuzzleHttp\Exception\ServerErrorResponseException;
 use Syntax\SteamApi\Exceptions\ApiCallFailedException;
 use Syntax\SteamApi\Exceptions\ClassNotFoundException;
+use GuzzleHttp\Psr7\Request;
 
 /**
  * @method \Syntax\SteamApi\Steam\News       news()
@@ -22,13 +22,13 @@ use Syntax\SteamApi\Exceptions\ClassNotFoundException;
  */
 class Client
 {
-    use SteamId;
+    use SteamId {
+        SteamId::__construct as private __sidConstruct;
+    }
 
     public $validFormats = ['json', 'xml', 'vdf'];
 
     protected $url = 'http://api.steampowered.com/';
-
-    protected $client;
 
     protected $interface;
 
@@ -46,9 +46,10 @@ class Client
 
     public function __construct()
     {
+        $this->__sidConstruct();
+
         $apiKey = $this->getApiKey();
 
-        $this->client = new GuzzleClient();
         $this->apiKey = $apiKey;
 
         // Set up the Ids
@@ -133,33 +134,6 @@ class Client
 
         // Pass the results back
         return simplexml_load_file($steamUrl . '?' . $parameters);
-    }
-
-    /**
-     * @param \Guzzle\Http\Message\RequestInterface $request
-     *
-     * @throws ApiCallFailedException
-     * @return stdClass
-     */
-    protected function sendRequest($request)
-    {
-        // Try to get the result.  Handle the possible exceptions that can arise
-        try {
-            $response = $this->client->send($request);
-
-            $result       = new stdClass();
-            $result->code = $response->getStatusCode();
-            $result->body = json_decode($response->getBody(true));
-        } catch (ClientErrorResponseException $e) {
-            throw new ApiCallFailedException($e->getMessage(), $e->getResponse()->getStatusCode(), $e);
-        } catch (ServerErrorResponseException $e) {
-            throw new ApiCallFailedException('Api call failed to complete due to a server error.', $e->getResponse()->getStatusCode(), $e);
-        } catch (Exception $e) {
-            throw new ApiCallFailedException($e->getMessage(), $e->getCode(), $e);
-        }
-
-        // If all worked out, return the result
-        return $result;
     }
 
     private function buildUrl($version = false)

@@ -3,9 +3,14 @@
 namespace Syntax\SteamApi;
 
 use Syntax\SteamApi\Exceptions\UnrecognizedId;
+use GuzzleHttp\Client as GuzzleClient;
+use GuzzleHttp\Psr7\Request;
+use Exception;
 
 trait SteamId
 {
+    use RequestWrapper;
+
     public $formatted;
 
     private $rawValue;
@@ -56,6 +61,31 @@ trait SteamId
 
     private function convertToAll($id)
     {
+        if ( ! is_numeric($id)) {
+            $name = strtolower($id);
+            $this->getSteamIdFromPlayername($name);
+
+            $parameters = [
+                'key' => \Config::get('steam-api.steamApiKey'),
+                'vanityurl' => $id
+            ];
+
+            // Build the query string
+            $parameters = http_build_query($parameters);
+
+            $url = "https://api.steampowered.com/ISteamUser/ResolveVanityURL/v0001";
+
+            // Send the request and get the results
+            $request  = new Request('GET', $url . '?' . $parameters);
+            $responseReq = $this->sendRequest($request);
+            $response = $responseReq->body->response;
+            if ($response->success !== 1) {
+                throw new Exception("Impossible de récupérer un Steam ID à partir du pseudo du joueur.", 1);
+            }
+
+            $id = $response->steamid;
+        }
+
         list($type, $matches) = $this->determineIDType($id);
 
         $this->getRawValue($id, $type, $matches);
@@ -66,6 +96,11 @@ trait SteamId
         $this->convertToID3();
 
         return $this->formatted;
+    }
+
+    private function getSteamIdFromPlayername($playername)
+    {
+        $client = new GuzzleClient();
     }
 
     private function convertToID32()
@@ -103,7 +138,7 @@ trait SteamId
             return ['ID3', $matches];
         }
 
-        throw new UnrecognizedId('Id [' . $id . '] is not recognized as a steam id.');
+        throw new UnrecognizedId("L'ID [$id] n'est pas reconnu comme un Steam ID.");
     }
 
     /**
